@@ -602,11 +602,9 @@ function postToApps(payload) {
   
   var jsonBody = JSON.stringify(payload);
   var sizeKB = Math.round(jsonBody.length / 1024);
-  
-  // Strategy: try fetch with text/plain (doesn't trigger CORS preflight, works on iOS)
-  // If that fails, fall back to a hidden iframe form submit which always works.
   var body = 'data=' + encodeURIComponent(jsonBody);
   
+  // STRATEGY 1: Try standard fetch first - if it works we get the actual response
   return fetch(u, {
     method: 'POST',
     redirect: 'follow',
@@ -627,10 +625,25 @@ function postToApps(payload) {
   })
   .catch(function(err){
     var msg = err.message || String(err);
-    // If fetch failed (network error, CORS, etc.) - fall back to iframe form submit.
-    // This always works because it's just a regular HTML form POST.
+    // STRATEGY 2: Fetch failed, try no-cors fetch.
+    // no-cors actually delivers the request to Apps Script but we can't read
+    // the response. We trust the idempotency token + retry to handle duplicates.
     if(msg.indexOf('Failed to fetch') >= 0 || msg.indexOf('Network') >= 0 || msg.indexOf('NetworkError') >= 0){
-      return submitViaIframe(u, jsonBody, sizeKB);
+      return fetch(u, {
+        method: 'POST',
+        mode: 'no-cors',
+        redirect: 'follow',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: body
+      })
+      .then(function(){
+        // no-cors response is opaque - we can't read it, but the request went through
+        return {ok:true, opaque:true};
+      })
+      .catch(function(err2){
+        // STRATEGY 3: Both fetches failed - try iframe form submit as last resort
+        return submitViaIframe(u, jsonBody, sizeKB);
+      });
     }
     throw err;
   });
