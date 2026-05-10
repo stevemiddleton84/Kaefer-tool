@@ -882,17 +882,31 @@ if(localStorage.getItem('kaefer_setup_done')){
 </div></div>
 
 <!-- CCV MODAL -->
-<div class="ml" id="ml"><div class="mb"><div class="mhd" style="background:var(--r)"><h3 id="mtt">Update Hazard</h3><button class="mc" onclick="closeMl()">&#215;</button></div>
-  <div class="mbd"><div id="ment"></div>
-    <div class="mf"><label>CCCs Completed</label><input type="number" id="mc1" min="0" value="0"></div>
-    <div class="mf"><label>CCFVs Completed</label><input type="number" id="mc2" min="0" value="0"></div>
-    <div style="background:#fff5f5;border:1px solid #ffcdd2;border-radius:5px;padding:9px;margin-bottom:9px">
-      <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:#c62828;margin-bottom:5px">&#9888; Add Control Not in Place</div>
-      <div class="mf" style="margin-bottom:5px"><label>Count</label><input type="number" id="mc3" min="0" placeholder="How many?"></div>
-      <div class="mf" style="margin-bottom:0"><label>Notes</label><textarea id="mn" placeholder="Describe..."></textarea></div>
+<div class="ml" id="ml"><div class="mb" style="width:520px;max-width:95vw"><div class="mhd" style="background:var(--r)"><h3 id="mtt">Update Hazard</h3><button class="mc" onclick="closeMl()">&#215;</button></div>
+  <div class="mbd">
+    <!-- Existing inspections list -->
+    <div id="insp-list" style="margin-bottom:12px"></div>
+    
+    <!-- Add new inspection form -->
+    <div style="background:#f5f7fa;border:1px solid #cfd8dc;border-radius:6px;padding:11px;margin-bottom:9px">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:#1a2a4a;margin-bottom:8px;letter-spacing:.3px">&#43; Log a New Inspection</div>
+      
+      <div style="display:flex;gap:6px;margin-bottom:8px">
+        <button type="button" id="mi-type-ccc" onclick="setInspType('CCC')" style="flex:1;padding:8px;background:#fff;border:2px solid #cfd8dc;border-radius:5px;cursor:pointer;font-weight:700;font-size:12px;font-family:inherit">CCC<br><span style="font-size:9px;font-weight:400;color:#607d8b">Team Check</span></button>
+        <button type="button" id="mi-type-ccfv" onclick="setInspType('CCFV')" style="flex:1;padding:8px;background:#fff;border:2px solid #cfd8dc;border-radius:5px;cursor:pointer;font-weight:700;font-size:12px;font-family:inherit">CCFV<br><span style="font-size:9px;font-weight:400;color:#607d8b">Supervisor Check</span></button>
+      </div>
+      
+      <div style="display:flex;gap:6px;margin-bottom:8px">
+        <button type="button" id="mi-res-green" onclick="setInspResult('green')" style="flex:1;padding:8px;background:#fff;border:2px solid #cfd8dc;border-radius:5px;cursor:pointer;font-weight:700;font-size:12px;font-family:inherit;color:#2e7d32">&#10003; All Controls In Place</button>
+        <button type="button" id="mi-res-red" onclick="setInspResult('red')" style="flex:1;padding:8px;background:#fff;border:2px solid #cfd8dc;border-radius:5px;cursor:pointer;font-weight:700;font-size:12px;font-family:inherit;color:#c62828">&#10005; Control Not In Place</button>
+      </div>
+      
+      <div class="mf" id="mi-notes-wrap" style="margin-bottom:0;display:none"><label>Notes (what wasn't in place?)</label><textarea id="mn" placeholder="Describe what was missing or non-compliant..." style="width:100%"></textarea></div>
+      
+      <button type="button" class="rb" onclick="addInspection()" style="margin-top:8px;width:100%;font-size:13px">&#43; Add This Inspection</button>
     </div>
   </div>
-  <div class="mft"><button class="ob" onclick="closeMl()">Cancel</button><button class="rb" onclick="saveMl()">Save</button></div>
+  <div class="mft"><button class="ob" onclick="closeMl()">Done</button></div>
 </div></div>
 
 <!-- ADD EMPLOYEE -->
@@ -1042,31 +1056,110 @@ function ldLoc(){var s=glj('ccv_'+cY+'_'+cM,null);if(!s)return;s.forEach(functio
 var HZ=['Vehicle impact on person','Vehicle collision or rollover','Contact with electricity','Confined spaces','Entanglement and crushing','Exposure to hazardous substances','Fall from height','Falling objects','Lifting operations','Exposure to thermal substances','Rope failure','Uncontrolled release of energy'];
 var SL2=[['Vehicle','impact','on person'],['Vehicle','collision /','rollover'],['Contact','with','electricity'],['Confined','spaces',''],['Entanglement','& crushing',''],['Hazardous','substances',''],['Fall from','height',''],['Falling','objects',''],['Lifting','operations',''],['Thermal','substances',''],['Rope','failure',''],['Uncontrolled','energy','release']];
 var now2=new Date(),cM=now2.getMonth(),cY=now2.getFullYear(),sS=null;
-function eWD(){return HZ.map(function(){return{ccc:0,ccfv:0,red:0,notes:'',dl:'',entries:[]};});}
+function eWD(){return HZ.map(function(){return{ccc:0,ccfv:0,red:0,notes:'',dl:'',entries:[],inspections:[]};});}
 var wd=eWD();
 var cvEl=document.getElementById('cv'),ctx=cvEl.getContext('2d');
 var CX=260,CY=260,RO=220,RI=157,RH=52,N=12,SLCE=(2*Math.PI)/N,OFF=-Math.PI/2;
+// Recompute counts (ccc/ccfv/red) from inspections array. Migrates old data on load.
+function recomputeCounts(seg){
+  if(!seg) return;
+  if(!Array.isArray(seg.inspections)) seg.inspections = [];
+  // Backward-compat: if we have old-style counts but no inspections, synthesize them
+  if(seg.inspections.length === 0 && (seg.ccc > 0 || seg.ccfv > 0)){
+    // Distribute red entries: assume all red were CCFV (supervisor checks) if any CCFV exist, else CCC
+    var redTotal = seg.red || 0;
+    var redOnCCFV = seg.ccfv > 0 ? Math.min(redTotal, seg.ccfv) : 0;
+    var redOnCCC = redTotal - redOnCCFV;
+    var ccfvGreen = Math.max(0, (seg.ccfv||0) - redOnCCFV);
+    var cccGreen = Math.max(0, (seg.ccc||0) - redOnCCC);
+    var k;
+    for(k=0;k<cccGreen;k++) seg.inspections.push({type:'CCC', result:'green', notes:'', date:seg.dl||''});
+    for(k=0;k<redOnCCC;k++) seg.inspections.push({type:'CCC', result:'red', notes:seg.notes||'', date:seg.dl||''});
+    for(k=0;k<ccfvGreen;k++) seg.inspections.push({type:'CCFV', result:'green', notes:'', date:seg.dl||''});
+    for(k=0;k<redOnCCFV;k++) seg.inspections.push({type:'CCFV', result:'red', notes:seg.notes||'', date:seg.dl||''});
+  }
+  // Recompute counts from inspections
+  var ccc=0, ccfv=0, red=0;
+  seg.inspections.forEach(function(it){
+    if(it.type==='CCC') ccc++;
+    else if(it.type==='CCFV') ccfv++;
+    if(it.result==='red') red++;
+  });
+  seg.ccc = ccc; seg.ccfv = ccfv; seg.red = red;
+}
+
 function dW(){
   ctx.clearRect(0,0,520,520);
+  // Ensure each segment has inspections array
+  wd.forEach(recomputeCounts);
+  
   for(var i=0;i<N;i++){
     var s=OFF+i*SLCE,e=s+SLCE,m2=(s+e)/2,seg=wd[i];
+    // Outer wedge (CCC) - grey background
     ctx.beginPath();ctx.moveTo(CX+RI*Math.cos(s),CY+RI*Math.sin(s));ctx.arc(CX,CY,RO,s,e);ctx.arc(CX,CY,RI,e,s,true);ctx.closePath();
-    ctx.fillStyle=seg.red>0?'#c62828':(seg.ccc>0?'#2e7d32':'#cfd8dc');ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=2.5;ctx.stroke();
+    ctx.fillStyle='#cfd8dc';ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=2.5;ctx.stroke();
+    // Inner wedge (CCFV) - lighter grey
     ctx.beginPath();ctx.moveTo(CX+RH*Math.cos(s),CY+RH*Math.sin(s));ctx.arc(CX,CY,RI,s,e);ctx.arc(CX,CY,RH,e,s,true);ctx.closePath();
-    ctx.fillStyle=seg.red>0?'#ef9a9a':(seg.ccfv>0?'#a5d6a7':'#eceff1');ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.stroke();
-    var orr=(RI+RO)/2,ox=CX+orr*Math.cos(m2),oy=CY+orr*Math.sin(m2),ov=seg.red>0?seg.red:seg.ccc;
-    if(ov>0){ctx.fillStyle='#fff';ctx.font='bold 12px Arial';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(ov,ox,oy);}
-    var irr=(RH+RI)/2,ix=CX+irr*Math.cos(m2),iy=CY+irr*Math.sin(m2);
-    if(seg.ccfv>0||seg.red>0){ctx.fillStyle=seg.red>0?'#7f0000':'#1b5e20';ctx.font='bold 9px Arial';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(seg.red>0?seg.red:seg.ccfv,ix,iy);}
+    ctx.fillStyle='#eceff1';ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.stroke();
+    
+    // Draw inspection bubbles inside each wedge
+    var inspections = seg.inspections || [];
+    var cccInspections = inspections.filter(function(it){return it.type==='CCC';});
+    var ccfvInspections = inspections.filter(function(it){return it.type==='CCFV';});
+    drawBubbles(cccInspections, m2, (RI+RO)/2, RO-RI);
+    drawBubbles(ccfvInspections, m2, (RH+RI)/2, RI-RH);
+    
+    // Hazard label outside the wheel
     var lr=RO+18,lx=CX+lr*Math.cos(m2),ly=CY+lr*Math.sin(m2);
     ctx.fillStyle='#37474f';ctx.font='9px Arial';ctx.textAlign='center';ctx.textBaseline='middle';
     var ln=SL2[i].filter(function(l){return l!='';});
     for(var li2=0;li2<ln.length;li2++)ctx.fillText(ln[li2],lx,ly+(li2-(ln.length-1)/2)*11);
   }
+  // Centre circle
   ctx.beginPath();ctx.arc(CX,CY,RH,0,2*Math.PI);ctx.fillStyle='#cc0000';ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=2.5;ctx.stroke();
   ctx.fillStyle='#fff';ctx.font='bold 11px Arial';ctx.textAlign='center';ctx.textBaseline='middle';
   ctx.fillText(MNS3[cM],CX,CY-7);ctx.fillText(cY,CX,CY+7);
   uSt();uSumT();uAlT();
+}
+
+// Draw inspection bubbles centered along an arc within a wedge.
+// inspections: list of {type, result}. midAngle: middle angle of wedge.
+// radius: distance from center where bubbles sit. radialThickness: how thick the wedge is.
+function drawBubbles(inspections, midAngle, radius, radialThickness){
+  if(!inspections.length) return;
+  var n = inspections.length;
+  // Bubble size: smaller when more bubbles needed
+  var BUBBLE_R = n <= 4 ? 5 : n <= 8 ? 4 : n <= 12 ? 3 : 2.5;
+  // Try arranging in a row along the arc; if too many, use 2 rows
+  var maxPerRow = Math.floor((SLCE * radius * 0.7) / (BUBBLE_R * 2.4));
+  if(maxPerRow < 1) maxPerRow = 1;
+  var rows = Math.ceil(n / maxPerRow);
+  if(rows > 2) rows = 2; // cap at 2 rows
+  var perRow = Math.ceil(n / rows);
+  var bubbleSpacing = BUBBLE_R * 2.3;
+  var rowSpacing = BUBBLE_R * 2.3;
+  
+  var idx = 0;
+  for(var r = 0; r < rows; r++){
+    var rowCount = Math.min(perRow, n - idx);
+    var rowRadius = radius + (r - (rows-1)/2) * rowSpacing;
+    // Spread bubbles in this row along the arc
+    var totalArc = (rowCount - 1) * bubbleSpacing;
+    var startAngleOffset = -totalArc / (2 * rowRadius);
+    for(var b = 0; b < rowCount; b++){
+      var a = midAngle + startAngleOffset + (b * bubbleSpacing / rowRadius);
+      var bx = CX + rowRadius * Math.cos(a);
+      var by = CY + rowRadius * Math.sin(a);
+      var insp = inspections[idx++];
+      ctx.beginPath();
+      ctx.arc(bx, by, BUBBLE_R, 0, 2 * Math.PI);
+      ctx.fillStyle = insp.result === 'red' ? '#c62828' : '#2e7d32';
+      ctx.fill();
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+    }
+  }
 }
 function uSt(){var c=0,f=0,r=0;wd.forEach(function(s){c+=s.ccc;f+=s.ccfv;r+=s.red;});document.getElementById('sc1').textContent=c;document.getElementById('sc2').textContent=f;document.getElementById('sc3').textContent=r;}
 function uSumT(){var tb=document.getElementById('stb');tb.innerHTML='';wd.forEach(function(seg,i){var hd=seg.ccc>0||seg.ccfv>0||seg.red>0;var st=hd?(seg.red>0?'<span class="badge br">Not in place</span>':'<span class="badge bg">In place</span>'):'<span class="badge bgr">No data</span>';var tr=document.createElement('tr');tr.innerHTML='<td>'+HZ[i]+'</td><td>'+(seg.ccc||'–')+'</td><td>'+(seg.ccfv||'–')+'</td><td style="color:'+(seg.red>0?'#c62828':'inherit')+';font-weight:'+(seg.red>0?700:400)+'">'+(seg.red||'–')+'</td><td>'+st+'</td>';tb.appendChild(tr);});}
@@ -1084,19 +1177,131 @@ cvEl.addEventListener('click',function(e){
   var x=(e.clientX-r.left)*sx-CX,y=(e.clientY-r.top)*sy-CY,dist=Math.sqrt(x*x+y*y);
   if(dist<RH||dist>RO)return;
   var a=Math.atan2(y,x)-OFF;if(a<0)a+=2*Math.PI;sS=Math.floor(a/SLCE)%N;
-  document.getElementById('mtt').textContent=HZ[sS];
-  document.getElementById('mc1').value=wd[sS].ccc;document.getElementById('mc2').value=wd[sS].ccfv;
-  document.getElementById('mc3').value='';document.getElementById('mn').value='';
-  var ents=wd[sS].entries||[],eh='';
-  if(ents.length){
-    eh='<div style="margin-bottom:8px;border-top:1px solid #eee;padding-top:6px"><div style="font-size:9px;font-weight:700;text-transform:uppercase;color:#607d8b;margin-bottom:3px">Previous Entries</div>';
-    ents.forEach(function(en,ei){eh+='<div style="display:flex;align-items:flex-start;gap:5px;margin-bottom:3px;background:#fff5f5;border-radius:3px;padding:4px 7px"><span style="background:#c62828;color:#fff;font-weight:700;font-size:10px;padding:1px 5px;border-radius:2px">'+en.count+'</span><span style="font-size:11px;flex:1">'+(en.notes||'<i style="color:#bbb">No notes</i>')+'</span><span style="font-size:10px;color:#999">'+en.date+'</span><button onclick="dEnt('+sS+','+ei+')" style="background:none;border:none;color:#c62828;cursor:pointer;font-size:13px;line-height:1;padding:0">&#215;</button></div>';});
-    eh+='</div>';}
-  document.getElementById('ment').innerHTML=eh;document.getElementById('ml').classList.add('on');
+  openHazardModal();
 });
+
+var INSP_TYPE = '';   // 'CCC' or 'CCFV'
+var INSP_RESULT = ''; // 'green' or 'red'
+
+function openHazardModal(){
+  if(sS===null) return;
+  document.getElementById('mtt').textContent = HZ[sS];
+  INSP_TYPE = '';
+  INSP_RESULT = '';
+  // Reset all selection states
+  setInspType('');
+  setInspResult('');
+  document.getElementById('mn').value = '';
+  document.getElementById('mi-notes-wrap').style.display = 'none';
+  renderInspectionList();
+  document.getElementById('ml').classList.add('on');
+}
+
+function setInspType(t){
+  INSP_TYPE = t;
+  var btnC = document.getElementById('mi-type-ccc');
+  var btnF = document.getElementById('mi-type-ccfv');
+  btnC.style.background = t === 'CCC' ? '#1a2a4a' : '#fff';
+  btnC.style.color = t === 'CCC' ? '#fff' : '#000';
+  btnC.style.borderColor = t === 'CCC' ? '#1a2a4a' : '#cfd8dc';
+  btnF.style.background = t === 'CCFV' ? '#1a2a4a' : '#fff';
+  btnF.style.color = t === 'CCFV' ? '#fff' : '#000';
+  btnF.style.borderColor = t === 'CCFV' ? '#1a2a4a' : '#cfd8dc';
+}
+
+function setInspResult(r){
+  INSP_RESULT = r;
+  var btnG = document.getElementById('mi-res-green');
+  var btnR = document.getElementById('mi-res-red');
+  btnG.style.background = r === 'green' ? '#2e7d32' : '#fff';
+  btnG.style.color = r === 'green' ? '#fff' : '#2e7d32';
+  btnG.style.borderColor = r === 'green' ? '#2e7d32' : '#cfd8dc';
+  btnR.style.background = r === 'red' ? '#c62828' : '#fff';
+  btnR.style.color = r === 'red' ? '#fff' : '#c62828';
+  btnR.style.borderColor = r === 'red' ? '#c62828' : '#cfd8dc';
+  document.getElementById('mi-notes-wrap').style.display = r === 'red' ? '' : 'none';
+}
+
+function renderInspectionList(){
+  if(sS===null) return;
+  var seg = wd[sS];
+  recomputeCounts(seg);
+  var list = document.getElementById('insp-list');
+  var inspections = seg.inspections || [];
+  if(!inspections.length){
+    list.innerHTML = '<div style="font-size:11px;color:#607d8b;font-style:italic;padding:10px;background:#f8f8f8;border-radius:4px;text-align:center">No inspections logged for this hazard in '+MNS3[cM]+' '+cY+' yet.</div>';
+    return;
+  }
+  var html = '<div style="font-size:10px;font-weight:700;text-transform:uppercase;color:#607d8b;margin-bottom:5px;letter-spacing:.3px">Inspections this month ('+inspections.length+')</div>';
+  inspections.forEach(function(it, i){
+    var color = it.result === 'red' ? '#c62828' : '#2e7d32';
+    var bg = it.result === 'red' ? '#fff5f5' : '#f1f8f3';
+    var border = it.result === 'red' ? '#ffcdd2' : '#c8e6c9';
+    var icon = it.result === 'red' ? '&#10005;' : '&#10003;';
+    html += '<div style="display:flex;align-items:flex-start;gap:7px;margin-bottom:4px;background:'+bg+';border:1px solid '+border+';border-radius:4px;padding:6px 9px">';
+    html += '<span style="background:'+color+';color:#fff;font-weight:700;font-size:10px;padding:2px 5px;border-radius:3px;min-width:42px;text-align:center">'+icon+' '+(it.type||'')+'</span>';
+    html += '<div style="flex:1;font-size:11px">';
+    if(it.notes) html += '<div>'+escHtml(it.notes)+'</div>';
+    else html += '<div style="color:#999;font-style:italic">'+(it.result==='green'?'All controls in place':'No notes')+'</div>';
+    if(it.date) html += '<div style="font-size:10px;color:#999;margin-top:2px">'+escHtml(it.date)+'</div>';
+    html += '</div>';
+    html += '<button onclick="dInsp('+sS+','+i+')" style="background:none;border:none;color:#c62828;cursor:pointer;font-size:14px;line-height:1;padding:0">&#215;</button>';
+    html += '</div>';
+  });
+  list.innerHTML = html;
+}
+
+function addInspection(){
+  if(sS===null) return;
+  if(!INSP_TYPE){ alert('Please choose inspection type: CCC or CCFV'); return; }
+  if(!INSP_RESULT){ alert('Please choose the result: In Place or Not In Place'); return; }
+  var notes = document.getElementById('mn').value.trim();
+  if(INSP_RESULT === 'red' && !notes){ alert('Please add notes about what was not in place.'); return; }
+  if(!wd[sS].inspections) wd[sS].inspections = [];
+  var ds = new Date().toLocaleDateString('en-AU',{day:'2-digit',month:'short',year:'numeric'});
+  wd[sS].inspections.push({type: INSP_TYPE, result: INSP_RESULT, notes: notes, date: ds});
+  recomputeCounts(wd[sS]);
+  // Reset entry form
+  setInspType('');
+  setInspResult('');
+  document.getElementById('mn').value = '';
+  document.getElementById('mi-notes-wrap').style.display = 'none';
+  renderInspectionList();
+  dW();
+  svSh();
+  svLoc();
+}
+
+function dInsp(si, ii){
+  if(!confirm('Delete this inspection?')) return;
+  if(!wd[si].inspections) return;
+  wd[si].inspections.splice(ii, 1);
+  recomputeCounts(wd[si]);
+  renderInspectionList();
+  dW();
+  svSh();
+  svLoc();
+}
+
 function closeMl(){document.getElementById('ml').classList.remove('on');}
-function saveMl(){if(sS===null)return;wd[sS].ccc=parseInt(document.getElementById('mc1').value)||0;wd[sS].ccfv=parseInt(document.getElementById('mc2').value)||0;var nr=parseInt(document.getElementById('mc3').value)||0,nt=document.getElementById('mn').value.trim();if(nr>0||nt){if(!wd[sS].entries)wd[sS].entries=[];var ds=new Date().toLocaleDateString('en-AU',{day:'2-digit',month:'short',year:'numeric'});wd[sS].entries.push({count:nr,notes:nt,date:ds});wd[sS].red=wd[sS].entries.reduce(function(s,en){return s+(en.count||0);},0);wd[sS].dl=ds;}closeMl();dW();svSh();svLoc();}
-function dEnt(si,ei){if(!confirm('Delete?'))return;wd[si].entries.splice(ei,1);wd[si].red=wd[si].entries.reduce(function(s,en){return s+(en.count||0);},0);if(!wd[si].entries.length)wd[si].dl='';dW();svSh();svLoc();}
+
+// Legacy stub (no-op) for backward compatibility with old onclick handlers
+function saveMl(){ closeMl(); }
+function dEnt(si,ei){
+  // Map old "entries" deletes to inspections list - delete first red red inspection
+  if(!wd[si].entries) return;
+  wd[si].entries.splice(ei, 1);
+  if(wd[si].inspections){
+    for(var k=0;k<wd[si].inspections.length;k++){
+      if(wd[si].inspections[k].result==='red'){
+        wd[si].inspections.splice(k,1);
+        break;
+      }
+    }
+  }
+  recomputeCounts(wd[si]);
+  dW();svSh();svLoc();
+}
 function clrM(){if(confirm('Clear CCV for '+MNS3[cM]+' '+cY+'?')){wd=eWD();dW();svSh();svLoc();}}
 var CLS=[{t:'Documentation',r:true,i:['JHA tasks appropriate for the job','JHA used and understood by all','Hazards clearly identified and controlled','TAKE 5 completed','Permits are approved and established','Isolations are approved, in place and verified','Work area is demarcated and sign posted','SDS available at work front where applicable']},{t:'Housekeeping',r:false,i:['Adequate access / egress to work sites','Rubbish bins provided, used and emptied regularly','Waste stored / removed / segregated correctly','Work platforms clear / free of loose items','Materials secured at height to prevent drop objects','Adequate lighting – night work','All hoses and leads are off the ground','Correct signage in place, legible and visible','Hazardous substances correctly labelled and stored']},{t:'Critical Risk Activity',r:true,i:['Risk assessment undertaken for all high-risk activities','Controls in place and deemed effective','Work completed as per THA / TRA / SWMS','Site operatives hold appropriate licences','VOC conducted for High-Risk Work Licences','VOC no older than 2 years from issue','Correct tools being used for the job']},{t:'Working at Height Compliance',r:true,i:['Risk assessments done for all W@H tasks','W@H equipment is registered','W@H equipment inspected and tagged correctly','Working at height permit in place','Site operatives trained, licensed and competent','Drop zone / exclusion zone in place and marked','Tools are tethered / tool lanyards in use','Employees under fall restraint secured 100%','Anchor points certified by competent person','Prestart completed on EWP','Spotters in place as required','Effective rescue plan in place']},{t:'PPE',r:false,i:['Task specific PPE available, aligned to JHA','Boots are laced up to the top','Correct gloves being worn for the tasks','Area and task specific PPE worn at work front']},{t:'Vehicles & Mobile Equipment',r:false,i:['All vehicles reverse parked','Daily pre-start check completed','Vehicle is clean and tidy']}];
 (function(){var wrap=document.getElementById('cls');CLS.forEach(function(sec,si){var div=document.createElement('div');div.style.cssText='margin-bottom:9px;border:1px solid var(--bd);border-radius:7px;overflow:hidden';var h='<div class="csh '+(sec.r?'red':'gray')+'">'+(sec.r?'&#9888; ':'')+sec.t+'</div>';sec.i.forEach(function(item,ii){var id='c_'+si+'_'+ii;h+='<div class="ci"><div style="font-size:12px">'+item+'</div><div style="display:flex;gap:3px"><button class="yn" id="y_'+id+'" onclick="tYN(this,\'y\',\''+id+'\')">YES</button><button class="yn" id="n_'+id+'" onclick="tYN(this,\'n\',\''+id+'\')">NO</button><button class="yn" id="a_'+id+'" onclick="tYN(this,\'a\',\''+id+'\')">N/A</button></div><input class="cc" type="text" id="m_'+id+'" placeholder="Comment"></div>';});div.innerHTML=h;wrap.appendChild(div);});})();
