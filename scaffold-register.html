@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#1F3864">
+<title>Scaffold Register</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+    background: #f4f6f9; color: #1a1a1a; font-size: 16px;
+  }
+  header {
+    background: #1F3864; color: white;
+    padding: 14px 16px; position: sticky; top: 0; z-index: 50;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+  }
+  header h1 { margin: 0; font-size: 18px; font-weight: 600; }
+  header .sub { font-size: 12px; opacity: 0.8; margin-top: 2px; }
+
+  .tabs {
+    display: flex; background: white; position: sticky; top: 56px; z-index: 49;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  }
+  .tab {
+    flex: 1; padding: 12px 8px; text-align: center;
+    font-size: 13px; font-weight: 600; color: #888;
+    cursor: pointer; border-bottom: 3px solid transparent;
+    touch-action: manipulation; user-select: none;
+  }
+  .tab.active { color: #1F3864; border-bottom-color: #1F3864; }
+  .tab .badge {
+    display: inline-block; min-width: 18px; padding: 1px 6px;
+    background: #c62828; color: white; border-radius: 10px;
+    font-size: 11px; margin-left: 4px; vertical-align: middle;
+  }
+  .tab.active .badge { background: #1F3864; }
+  .tab .badge.zero { display: none; }
+
+  main { padding: 12px; padding-bottom: 40px; max-width: 720px; margin: 0 auto; }
+  .search-wrap { margin-bottom: 12px; }
+  .search-wrap input {
+    width: 100%; padding: 11px 12px 11px 36px; font-size: 16px;
+    border: 1px solid #ccd2da; border-radius: 8px;
+    background: white url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2'><circle cx='11' cy='11' r='7'/><line x1='21' y1='21' x2='16.65' y2='16.65'/></svg>") no-repeat 10px center;
+    -webkit-appearance: none; appearance: none;
+  }
+  .search-wrap input:focus { outline: none; border-color: #1F3864; box-shadow: 0 0 0 3px rgba(31,56,100,0.15); }
+
+  .scaffold-card {
+    background: white; border-radius: 10px; padding: 14px;
+    margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    cursor: pointer;
+  }
+  .scaffold-card .top {
+    display: flex; justify-content: space-between; align-items: start;
+    margin-bottom: 6px; gap: 8px;
+  }
+  .scaffold-card .tag { font-weight: 700; font-size: 16px; color: #1F3864; }
+  .scaffold-card .loc { font-size: 13px; color: #555; margin-top: 2px; }
+  .scaffold-card .meta { font-size: 12px; color: #888; margin-top: 6px; }
+  .scaffold-card .stats {
+    display: flex; gap: 12px; margin-top: 8px; font-size: 12px;
+    padding-top: 8px; border-top: 1px solid #f0f2f5;
+  }
+  .scaffold-card .stats span b { color: #1F3864; font-weight: 700; }
+
+  .pill {
+    display: inline-block; padding: 2px 8px; border-radius: 12px;
+    font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px;
+    flex-shrink: 0;
+  }
+  .pill.pending  { background: #fff4d6; color: #8a6500; }
+  .pill.active   { background: #d6f0d8; color: #1f5e22; }
+  .pill.dismantled { background: #e8eaed; color: #555; }
+
+  .empty-state { text-align: center; color: #888; padding: 60px 20px; font-size: 14px; }
+  .empty-state .icon { font-size: 48px; margin-bottom: 8px; opacity: 0.3; }
+
+  /* Detail modal */
+  .modal-backdrop {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+    z-index: 200; display: none;
+  }
+  .modal-backdrop.show { display: block; }
+  .detail-modal {
+    position: fixed; inset: 0; background: #f4f6f9;
+    z-index: 201; display: none; overflow-y: auto;
+    flex-direction: column;
+  }
+  .detail-modal.show { display: flex; }
+  .detail-header {
+    background: #1F3864; color: white; padding: 14px 16px;
+    position: sticky; top: 0; z-index: 5;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .detail-header .back {
+    background: none; border: none; color: white; font-size: 22px;
+    cursor: pointer; padding: 4px 8px; line-height: 1;
+  }
+  .detail-header .title { flex: 1; font-size: 16px; font-weight: 600; }
+  .detail-body { padding: 12px; padding-bottom: 100px; max-width: 720px; margin: 0 auto; width: 100%; }
+
+  .info-grid {
+    background: white; border-radius: 10px; padding: 12px 14px;
+    margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  }
+  .info-grid .row {
+    display: flex; justify-content: space-between; padding: 6px 0;
+    border-bottom: 1px solid #f0f2f5; gap: 12px;
+  }
+  .info-grid .row:last-child { border-bottom: none; }
+  .info-grid .row .label { color: #888; font-size: 13px; }
+  .info-grid .row .value { font-weight: 500; font-size: 14px; text-align: right; word-break: break-word; }
+
+  .components-list { background: white; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+  .components-list .cat-title {
+    padding: 10px 14px; background: #D9E1F2; color: #1F3864;
+    font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px;
+  }
+  .components-list .cat-title:first-child { border-radius: 10px 10px 0 0; }
+  .components-list .comp-row {
+    display: flex; justify-content: space-between; padding: 10px 14px;
+    border-top: 1px solid #f0f2f5; gap: 12px; font-size: 14px;
+  }
+  .components-list .comp-row .d { flex: 1; }
+  .components-list .comp-row .q { color: #1F3864; font-weight: 600; min-width: 80px; text-align: right; }
+
+  .action-bar {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: white; padding: 12px 16px;
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+    box-shadow: 0 -2px 8px rgba(0,0,0,0.15);
+    display: flex; gap: 8px; z-index: 5;
+  }
+  .btn {
+    flex: 1; padding: 12px 16px; border-radius: 8px; border: none;
+    font-size: 14px; font-weight: 600; cursor: pointer;
+    touch-action: manipulation;
+  }
+  .btn-primary { background: #2E75B6; color: white; }
+  .btn-primary:active { background: #1F3864; }
+  .btn-approve { background: #2e7d32; color: white; }
+  .btn-approve:active { background: #1f5e22; }
+  .btn-reject  { background: #fff; color: #c62828; border: 1px solid #c62828; }
+  .btn-reject:active { background: #fee; }
+  .btn-danger { background: #c62828; color: white; }
+  .btn-danger:active { background: #8a1d1d; }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .confirm-modal {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+    z-index: 300; display: none; align-items: center; justify-content: center;
+    padding: 20px;
+  }
+  .confirm-modal.show { display: flex; }
+  .confirm-box {
+    background: white; border-radius: 12px; padding: 24px;
+    max-width: 360px; width: 100%;
+  }
+  .confirm-box h3 { margin: 0 0 8px 0; color: #1F3864; }
+  .confirm-box p { margin: 0 0 16px 0; color: #555; font-size: 14px; line-height: 1.5; }
+  .confirm-box .actions { display: flex; gap: 8px; }
+  .confirm-box .btn-cancel { background: #e8eaed; color: #1a1a1a; }
+
+  .toast {
+    position: fixed; top: 100px; left: 50%; transform: translateX(-50%);
+    background: #1a1a1a; color: white; padding: 12px 20px; border-radius: 8px;
+    font-size: 14px; z-index: 400; opacity: 0; pointer-events: none;
+    transition: opacity 0.2s; max-width: 90%; text-align: center;
+  }
+  .toast.show { opacity: 1; }
+  .toast.success { background: #2e7d32; }
+  .toast.error { background: #c62828; }
+
+  .loading { text-align: center; padding: 40px; color: #888; }
+  .spinner {
+    display: inline-block; width: 24px; height: 24px;
+    border: 3px solid #ccd2da; border-top-color: #1F3864;
+    border-radius: 50%; animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Scaffold Register</h1>
+  <div class="sub">KAEFER Yarwun</div>
+</header>
+
+<div class="tabs">
+  <div class="tab active" data-tab="pending">Pending <span class="badge zero" id="badgePending">0</span></div>
+  <div class="tab" data-tab="active">Active <span class="badge zero" id="badgeActive">0</span></div>
+  <div class="tab" data-tab="dismantled">Dismantled <span class="badge zero" id="badgeDismantled">0</span></div>
+</div>
+
+<main>
+  <div class="search-wrap">
+    <input type="search" id="search" placeholder="Search tag, location, erector...">
+  </div>
+  <div id="list">
+    <div class="loading"><div class="spinner"></div><div style="margin-top:8px;">Loading register...</div></div>
+  </div>
+</main>
+
+<div class="modal-backdrop" id="backdrop"></div>
+<div class="detail-modal" id="detailModal">
+  <div class="detail-header">
+    <button class="back" onclick="closeDetail()">←</button>
+    <div class="title" id="detailTitle">Scaffold</div>
+  </div>
+  <div class="detail-body" id="detailBody"></div>
+  <div class="action-bar" id="detailActions"></div>
+</div>
+
+<div class="confirm-modal" id="confirmModal">
+  <div class="confirm-box">
+    <h3 id="confirmTitle">Are you sure?</h3>
+    <p id="confirmMsg"></p>
+    <div class="actions">
+      <button class="btn btn-cancel" onclick="closeConfirm()">Cancel</button>
+      <button class="btn btn-primary" id="confirmOk">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="components.js"></script>
+<script>
+// ============================================================
+// CONFIG
+// ============================================================
+const WORKER_URL = "https://kaefer-forms.s-middleton.workers.dev";
+
+// Build a lookup of component ID -> {desc, kg, category}
+const COMP_LOOKUP = {};
+COMPONENTS.forEach(cat => cat.items.forEach(item => {
+  COMP_LOOKUP[item.id] = { ...item, category: cat.category };
+}));
+
+// ============================================================
+// State
+// ============================================================
+let currentTab = 'pending';
+let data = { pending: [], active: [], dismantled: [] };
+let openScaffold = null;
+
+// ============================================================
+// Fetch register
+// ============================================================
+async function loadRegister() {
+  try {
+    const res = await fetch(WORKER_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'scaffold_list' }),
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const json = await res.json();
+    if (!json.ok) throw new Error(json.error || 'Load failed');
+    data.pending = json.pending || [];
+    data.active = json.active || [];
+    data.dismantled = json.dismantled || [];
+    updateBadges();
+    renderList();
+  } catch (err) {
+    console.error(err);
+    document.getElementById('list').innerHTML =
+      `<div class="empty-state"><div class="icon">⚠</div>Could not load register.<br><small>${err.message}</small></div>`;
+  }
+}
+
+function updateBadges() {
+  ['pending', 'active', 'dismantled'].forEach(t => {
+    const el = document.getElementById('badge' + t.charAt(0).toUpperCase() + t.slice(1));
+    el.textContent = data[t].length;
+    el.classList.toggle('zero', data[t].length === 0);
+  });
+}
+
+// ============================================================
+// Render list
+// ============================================================
+function renderList() {
+  const list = document.getElementById('list');
+  const search = document.getElementById('search').value.trim().toLowerCase();
+  let items = data[currentTab];
+  if (search) {
+    items = items.filter(s =>
+      (s.tag || '').toLowerCase().includes(search) ||
+      (s.location || '').toLowerCase().includes(search) ||
+      (s.erectedBy || '').toLowerCase().includes(search)
+    );
+  }
+  if (items.length === 0) {
+    const msg = currentTab === 'pending' ? 'Nothing pending approval'
+              : currentTab === 'active'  ? 'No scaffolds on the active register'
+              : 'No dismantled scaffolds';
+    list.innerHTML = `<div class="empty-state"><div class="icon">✓</div>${msg}</div>`;
+    return;
+  }
+  list.innerHTML = items.map(s => `
+    <div class="scaffold-card" onclick="openDetail('${currentTab}', '${s.id}')">
+      <div class="top">
+        <div>
+          <div class="tag">${escapeHtml(s.tag)}</div>
+          <div class="loc">${escapeHtml(s.location || '')}</div>
+        </div>
+        <span class="pill ${currentTab}">${currentTab}</span>
+      </div>
+      <div class="meta">
+        Erected by ${escapeHtml(s.erectedBy || '—')} on ${formatDate(s.dateErected)}
+        ${s.dismantledAt ? `<br>Dismantled ${formatDate(s.dismantledAt)}` : ''}
+      </div>
+      <div class="stats">
+        <span><b>${s.totalItems || 0}</b> items</span>
+        <span><b>${(s.totalWeightKg || 0).toFixed(2)}</b> kg</span>
+        <span><b>${((s.totalWeightKg || 0) / 1000).toFixed(3)}</b> t</span>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ============================================================
+// Detail view
+// ============================================================
+function openDetail(tab, id) {
+  const scaffold = data[tab].find(s => s.id === id);
+  if (!scaffold) return;
+  openScaffold = { tab, scaffold };
+
+  document.getElementById('detailTitle').textContent = scaffold.tag;
+  const body = document.getElementById('detailBody');
+
+  // Build info grid
+  let html = `<div class="info-grid">
+    <div class="row"><span class="label">Tag</span><span class="value">${escapeHtml(scaffold.tag)}</span></div>
+    <div class="row"><span class="label">Location</span><span class="value">${escapeHtml(scaffold.location || '—')}</span></div>
+    <div class="row"><span class="label">Erected by</span><span class="value">${escapeHtml(scaffold.erectedBy || '—')}</span></div>
+    <div class="row"><span class="label">Date erected</span><span class="value">${formatDate(scaffold.dateErected)}</span></div>`;
+  if (scaffold.notes) {
+    html += `<div class="row"><span class="label">Notes</span><span class="value">${escapeHtml(scaffold.notes)}</span></div>`;
+  }
+  html += `
+    <div class="row"><span class="label">Total items</span><span class="value">${scaffold.totalItems || 0}</span></div>
+    <div class="row"><span class="label">Total weight</span><span class="value">${(scaffold.totalWeightKg || 0).toFixed(2)} kg (${((scaffold.totalWeightKg || 0)/1000).toFixed(3)} t)</span></div>`;
+  if (scaffold.submittedAt) html += `<div class="row"><span class="label">Submitted</span><span class="value">${formatDateTime(scaffold.submittedAt)}</span></div>`;
+  if (scaffold.approvedAt)  html += `<div class="row"><span class="label">Approved</span><span class="value">${formatDateTime(scaffold.approvedAt)}</span></div>`;
+  if (scaffold.dismantledAt)html += `<div class="row"><span class="label">Dismantled</span><span class="value">${formatDateTime(scaffold.dismantledAt)}</span></div>`;
+  html += `</div>`;
+
+  // Components grouped by category
+  const qtys = scaffold.quantities || {};
+  const byCategory = {};
+  Object.keys(qtys).forEach(cid => {
+    const comp = COMP_LOOKUP[cid];
+    if (!comp) return;
+    if (!byCategory[comp.category]) byCategory[comp.category] = [];
+    byCategory[comp.category].push({ ...comp, qty: qtys[cid] });
+  });
+
+  html += `<div class="components-list">`;
+  COMPONENTS.forEach(cat => {
+    if (!byCategory[cat.category]) return;
+    html += `<div class="cat-title">${cat.category}</div>`;
+    byCategory[cat.category].forEach(c => {
+      html += `<div class="comp-row">
+        <div class="d">${escapeHtml(c.desc)}<br><small style="color:#888;">${c.kg.toFixed(2)} kg each</small></div>
+        <div class="q">× ${c.qty}<br><small style="color:#888; font-weight:400;">${(c.qty * c.kg).toFixed(2)} kg</small></div>
+      </div>`;
+    });
+  });
+  html += `</div>`;
+
+  body.innerHTML = html;
+
+  // Actions per tab
+  const actions = document.getElementById('detailActions');
+  if (tab === 'pending') {
+    actions.innerHTML = `
+      <button class="btn btn-reject" onclick="confirmAction('reject')">Reject</button>
+      <button class="btn btn-approve" onclick="confirmAction('approve')">Approve</button>`;
+  } else if (tab === 'active') {
+    actions.innerHTML = `<button class="btn btn-danger" onclick="confirmAction('dismantle')">Mark as dismantled</button>`;
+  } else {
+    actions.innerHTML = '';
+  }
+
+  document.getElementById('detailModal').classList.add('show');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeDetail() {
+  document.getElementById('detailModal').classList.remove('show');
+  document.body.style.overflow = '';
+  openScaffold = null;
+}
+
+// ============================================================
+// Actions
+// ============================================================
+function confirmAction(action) {
+  const titles = { approve: 'Approve scaffold?', reject: 'Reject submission?', dismantle: 'Mark as dismantled?' };
+  const msgs = {
+    approve: `Move ${openScaffold.scaffold.tag} to the active register.`,
+    reject:  `Permanently delete this pending submission for ${openScaffold.scaffold.tag}.`,
+    dismantle: `Move ${openScaffold.scaffold.tag} from active to dismantled archive.`,
+  };
+  document.getElementById('confirmTitle').textContent = titles[action];
+  document.getElementById('confirmMsg').textContent = msgs[action];
+  const ok = document.getElementById('confirmOk');
+  ok.className = 'btn ' + (action === 'reject' ? 'btn-danger' : action === 'dismantle' ? 'btn-danger' : 'btn-approve');
+  ok.onclick = () => performAction(action);
+  document.getElementById('confirmModal').classList.add('show');
+}
+function closeConfirm() { document.getElementById('confirmModal').classList.remove('show'); }
+
+async function performAction(action) {
+  const { tab, scaffold } = openScaffold;
+  const ok = document.getElementById('confirmOk');
+  ok.disabled = true; ok.textContent = 'Working...';
+  try {
+    const res = await fetch(WORKER_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'scaffold_action', subAction: action, id: scaffold.id, fromTab: tab }),
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const json = await res.json();
+    if (!json.ok) throw new Error(json.error || 'Action failed');
+    closeConfirm();
+    closeDetail();
+    toast(action === 'approve' ? 'Approved' : action === 'reject' ? 'Rejected' : 'Marked dismantled', 'success');
+    loadRegister();
+  } catch (err) {
+    toast('Failed: ' + err.message, 'error');
+    ok.disabled = false; ok.textContent = 'Confirm';
+  }
+}
+
+// ============================================================
+// Tab switching + search
+// ============================================================
+document.querySelectorAll('.tab').forEach(t => {
+  t.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+    t.classList.add('active');
+    currentTab = t.dataset.tab;
+    renderList();
+  });
+});
+document.getElementById('search').addEventListener('input', renderList);
+
+// ============================================================
+// Helpers
+// ============================================================
+function escapeHtml(s) {
+  if (s == null) return '';
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function formatDate(s) {
+  if (!s) return '—';
+  const d = new Date(s);
+  if (isNaN(d)) return s;
+  return d.toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+function formatDateTime(s) {
+  if (!s) return '—';
+  const d = new Date(s);
+  if (isNaN(d)) return s;
+  return d.toLocaleString('en-AU', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+function toast(msg, type='') {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'toast show ' + type;
+  setTimeout(() => t.className = 'toast ' + type, 3000);
+}
+
+// Init
+loadRegister();
+</script>
+</body>
+</html>
