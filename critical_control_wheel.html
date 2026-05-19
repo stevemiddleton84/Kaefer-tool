@@ -5571,23 +5571,30 @@ function scfPickArea(area){
 // ============================================================
 // PART 4: Replace the Approve action with one that picks an area first
 // ============================================================
-var _origScfAction = scfAction;
-scfAction = function(action, id){
+var _origScfConfirmAction = scfConfirmAction;
+scfConfirmAction = function(action){
   if(action !== 'approve'){
-    _origScfAction.apply(this, arguments);
+    _origScfConfirmAction.apply(this, arguments);
     return;
   }
+  if(!SCF_OPEN_SCAFFOLD) return;
+  var scaffold = SCF_OPEN_SCAFFOLD.scaffold;
   // Approve flow: open area picker first
-  scfOpenAreaPicker('Approve Scaffold', 'Select the area this scaffold belongs to:', function(area){
-    if(!confirm('Approve this scaffold and assign to ' + area + '?')) return;
+  scfOpenAreaPicker('Approve Scaffold', 'Select the area for ' + scaffold.tag + ':', function(area){
     setSS('bz', 'Approving scaffold for ' + area + '...');
-    fetch(SCF_WORKER_URL, { method:'POST', redirect:'follow', headers:{'Content-Type':'text/plain'},
-      body: JSON.stringify({action:'scaffold_action', subAction:'approve', id:id, area:area}) })
+    var payload = JSON.stringify({
+      action: 'scaffold_action',
+      subAction: 'approve',
+      id: scaffold.id,
+      fromTab: SCF_OPEN_SCAFFOLD.tab,
+      area: area
+    });
+    fetch(SCF_WORKER_URL, { method:'POST', redirect:'follow', headers:{'Content-Type':'text/plain'}, body: payload })
       .then(function(r){ return r.json(); })
       .then(function(j){
         if(!j.ok) throw new Error(j.error || 'Approve failed');
-        setSS('ok','Approved');
         scfCloseDetail();
+        setSS('ok','Approved');
         scfLoad();
       })
       .catch(function(err){
@@ -5873,6 +5880,7 @@ scfUpdateBadges = function(){
   // Defer slightly so the page is settled
   setTimeout(scfCheckAreaBackfill, 800);
 };
+
   
 
   
