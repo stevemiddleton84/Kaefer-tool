@@ -6718,7 +6718,7 @@ scfUpdateStats = function(){
   // Per-area buckets with stage split
   var buckets = {};
   SCF_AREAS.forEach(function(a){
-    buckets[a] = { kg: 0, items: 0, s1: 0, s2: 0 };
+    buckets[a] = { kg: 0, items: 0, s1: 0, s2: 0, s1Count: 0, s2Count: 0 };
   });
   var totalKg = 0, totalItems = 0;
   var ltKg = 0, ltItems = 0;
@@ -6730,8 +6730,8 @@ scfUpdateStats = function(){
     if(s.area && buckets[s.area]){
       buckets[s.area].kg += kg;
       buckets[s.area].items += 1;
-      if(s.stage === '1') buckets[s.area].s1 += kg;
-      else if(s.stage === '2') buckets[s.area].s2 += kg;
+      if(s.stage === '1'){ buckets[s.area].s1 += kg; buckets[s.area].s1Count += 1; }
+      else if(s.stage === '2'){ buckets[s.area].s2 += kg; buckets[s.area].s2Count += 1; }
     }
   });
 
@@ -6759,6 +6759,10 @@ scfUpdateStats = function(){
     var s2 = document.getElementById('scf-stat-'+key+'-s2');
     if(s1) s1.textContent = (b.s1 / 1000).toFixed(1) + ' t';
     if(s2) s2.textContent = (b.s2 / 1000).toFixed(1) + ' t';
+    var s1c = document.getElementById('scf-stat-'+key+'-items-s1');
+    var s2c = document.getElementById('scf-stat-'+key+'-items-s2');
+    if(s1c) s1c.textContent = b.s1Count || 0;
+    if(s2c) s2c.textContent = b.s2Count || 0;
   });
 
   // Filter indicator
@@ -7117,8 +7121,10 @@ scfUpdateBadges = function(){
       if(opts.split){
         splitHtml = '<div style="margin-top:4px;font-size:10px;color:rgba(255,255,255,0.92);line-height:1.2;font-weight:700;text-shadow:0 1px 1px rgba(0,0,0,0.15);pointer-events:none">'
           + 'S1 <span id="' + opts.valueId + '-s1">0.0 t</span>'
+          + ' (<span id="' + opts.itemsId + '-s1">0</span>)'
           + ' &middot; '
           + 'S2 <span id="' + opts.valueId + '-s2">0.0 t</span>'
+          + ' (<span id="' + opts.itemsId + '-s2">0</span>)'
           + '</div>';
       }
       var bubbleId = 'scf-bubble-' + (opts.filterKey || 'unknown').replace(/[^a-zA-Z0-9]+/g,'-');
